@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/timcurless/lumberyard/Cassandra"
+	"github.com/timcurless/lumberyard/Pipelines"
 )
 
 type heartbeatResponse struct {
@@ -27,6 +28,8 @@ func main() {
 
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", heartbeat)
+	router.HandleFunc("/api/v1/pipelines", Pipelines.Get)
+	router.HandleFunc("/api/v1/pipelines/new", Pipelines.Post)
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }
