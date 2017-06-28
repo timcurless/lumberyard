@@ -1,0 +1,19 @@
+version: "3"
+services:
+  db:
+    image: cassandra:3
+    environment:
+      CASSANDRA_CLUSTER_NAME: lumberyard
+    ports:
+      - "127.0.0.1:9042:9042"
+    networks:
+      - dbnet
+
+  dbinit:
+    image: timcurless/cassandra_mig:3
+    depends_on:
+      - db
+    networks:
+      - dbnet
+networks:
+  dbnet:
