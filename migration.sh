@@ -8,3 +8,6 @@ echo "CREATE KEYSPACE lumberyard WITH REPLICATION = {'class': 'SimpleStrategy', 
 
 # Create pipelines TABLE
 echo "use lumberyard; CREATE TABLE pipelines ( id UUID, name text, description text, PRIMARY KEY (id));" | cqlsh db
+
+# Create stages TABLE
+echo "use lumberyard; CREATE TABLE stages ( id UUID, pipeline_id UUID, name text, description text, type text, version int, payload text, PRIMARY KEY(id));" | cqlsh db

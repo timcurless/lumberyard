@@ -1,12 +1,5 @@
 package main
 
-/*
-ccm create -v 3.1.1 lumberyard -n 1 -s
-echo "use lumberyard; CREATE TABLE pipelines ( id UUID, name text, description text, PRIMARY KEY (id));" | cqlsh --version 3.4.2
-echo "use lumberyard; CREATE TABLE stages ( id UUID, pipeline_id UUID, name text, description text, type text, version int, payload text, PRIMARY KEY (id));" | cqlsh --version 3.4.2
-echo "use lumberyard; create index on stages (pipeline_id);" | cqlsh --version 3.4.2
-*/
-
 import (
 	"encoding/json"
 	"log"
@@ -15,6 +8,7 @@ import (
 	"github.com/gorilla/mux"
 	"github.com/timcurless/lumberyard/Cassandra"
 	"github.com/timcurless/lumberyard/Pipelines"
+	"github.com/timcurless/lumberyard/Stages"
 )
 
 type heartbeatResponse struct {
@@ -28,8 +22,10 @@ func main() {
 
 	router := mux.NewRouter().StrictSlash(true)
 	router.HandleFunc("/", heartbeat)
-	router.HandleFunc("/api/v1/pipelines", Pipelines.Get)
-	router.HandleFunc("/api/v1/pipelines/new", Pipelines.Post)
+	router.HandleFunc("/api/v1/pipelines", Pipelines.Get).Methods("GET")
+	router.HandleFunc("/api/v1/pipelines", Pipelines.Post).Methods("POST")
+	router.HandleFunc("/api/v1/pipelines/{pipeline_uuid}", Pipelines.GetOne).Methods("GET")
+	router.HandleFunc("/api/v1/pipelines/{pipeline_uuid}/stages", Stages.Post).Methods("POST")
 
 	log.Fatal(http.ListenAndServe(":8080", router))
 }

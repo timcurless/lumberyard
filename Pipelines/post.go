@@ -9,7 +9,7 @@ import (
 	"github.com/timcurless/lumberyard/Cassandra"
 )
 
-// Post -- handles POST request to /api/v1/pipelines/new to create new pipeline
+// Post -- handles POST request to /api/v1/pipelines to create new pipeline
 // params:
 // w - response writer for building JSON payload response
 // r - request reader to fetch form data or url params
@@ -41,7 +41,7 @@ func Post(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// depending on whether we created the user, return the
+	// depending on whether we created the pipeline, return the
 	// resource ID in a JSON payload, or return our errors
 	if created {
 		fmt.Println("pipeline_id", gocqlUUID)
