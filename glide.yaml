@@ -1,0 +1,13 @@
+package: github.com/timcurless/lumberyard
+import:
+- package: github.com/gocql/gocql
+- package: github.com/gorilla/mux
+  version: ^1.5.0
+- package: github.com/go-kit/gokit
+  version: ^0.5.0
+  subpackages:
+  - endpoint
+- package: github.com/go-kit/kit
+  version: ^0.5.0
+  subpackages:
+  - transport/http
