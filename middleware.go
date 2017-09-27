@@ -29,3 +29,10 @@ func (mw loggingMiddleware) PostDeployment(ctx context.Context, d Deployment) (e
   }(time.Now())
   return mw.next.PostDeployment(ctx, d)
 }
+
+func (mw loggingMiddleware) GetDeployments(ctx context.Context) (deployments []Deployment, err error) {
+  defer func(begin time.Time) {
+    mw.logger.Log("method", "GetDeployments", "took", time.Since(begin), "err", err)
+  }(time.Now())
+  return mw.next.GetDeployments(ctx)
+}

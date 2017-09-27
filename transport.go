@@ -19,11 +19,18 @@ func MakeHTTPHandler (s Store, logger log.Logger) http.Handler {
 		httptransport.ServerErrorEncoder(encodeError),
 	}
 
-  // POST     /v1/deployments/             adds another deployment
+  // POST     /v1/deployments/             adds another deployment to Store
+  // GET      /v1/deployments/             returns all deployments from Store
 
   r.Methods("POST").Path("/v1/deployments/").Handler(httptransport.NewServer(
     e.PostDeploymentEndpoint,
     decodePostDeploymentRequest,
+    encodeResponse,
+    options...,
+  ))
+  r.Methods("GET").Path("/v1/deployments/").Handler(httptransport.NewServer(
+    e.GetDeploymentsEndpoint,
+    decodeGetDeploymentsRequest,
     encodeResponse,
     options...,
   ))
@@ -36,6 +43,10 @@ func decodePostDeploymentRequest(_ context.Context, r *http.Request) (request in
     return nil, e
   }
   return req, nil
+}
+
+func decodeGetDeploymentsRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
+  return getDeploymentsRequest{}, nil
 }
 
 func encodeResponse(ctx context.Context, w http.ResponseWriter, response interface{}) error {

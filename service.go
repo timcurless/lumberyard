@@ -12,7 +12,7 @@ import (
 
 // Defines a deployment (i.e. a demo environment)
 type Deployment struct {
-  ID        string      `json:"id"`
+  ID        gocql.UUID      `json:"id"`
   Name      string      `json:"name,omitempty"`
   Instances []string  `json:"instances,omitempty"`
 }
@@ -20,9 +20,13 @@ type Deployment struct {
 // Main Service Interface
 type Store interface {
   PostDeployment(ctx context.Context, d Deployment) error
+  GetDeployments(ctx context.Context) ([]Deployment, error)
 }
 
-type CassandraStore struct{ Session *gocql.Session }
+type CassandraStore struct {
+  Session *gocql.Session
+  Deployments []Deployment
+}
 
 type DataStoreFactory func() (Store)
 
@@ -80,4 +84,21 @@ func (s *CassandraStore) PostDeployment(ctx context.Context, d Deployment) error
     } else {
       return nil
     }
+}
+
+func (s *CassandraStore) GetDeployments(ctx context.Context) ([]Deployment, error) {
+  var deploymentList []Deployment
+  m := map[string]interface{}{}
+
+  iterable := s.Session.Query(`SELECT id,name,instances FROM deployments`).Iter()
+  for iterable.MapScan(m) {
+    deploymentList = append(deploymentList, Deployment{
+      ID: m["id"].(gocql.UUID),
+      Name: m["name"].(string),
+      Instances: m["instances"].([]string),
+    })
+    m = map[string]interface{}{}
+  }
+
+  return deploymentList, nil
 }
