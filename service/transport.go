@@ -30,6 +30,7 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 
 	// POST /projects/              Adds a new Project
 	// GET /projects/:id            Gets a Project
+	// POST /projects/:id/stacks/		Add a new Stack to a project
 
 	r.Methods("POST").Path("/projects/").Handler(httptransport.NewServer(
 		e.PostProjectEndpoint,
@@ -40,6 +41,12 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 	r.Methods("GET").Path("/projects/{id}").Handler(httptransport.NewServer(
 		e.GetProjectEndpoint,
 		decodeGetProjectRequest,
+		encodeResponse,
+		options...,
+	))
+	r.Methods("POST").Path("/projects/{id}/stacks").Handler(httptransport.NewServer(
+		e.PostStackEndpoint,
+		decodePostStackRequest,
 		encodeResponse,
 		options...,
 	))
@@ -73,6 +80,22 @@ func decodeGetProjectRequest(_ context.Context, r *http.Request) (request interf
 		return nil, ErrBadRouting
 	}
 	return getProjectRequest{ID: id}, nil
+}
+
+func decodePostStackRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
+	vars := mux.Vars(r)
+	id, ok := vars["id"]
+	if !ok {
+		return nil, ErrBadRouting
+	}
+	var stack Stack
+	if err := json.NewDecoder(r.Body).Decode(&stack); err != nil {
+		return nil, err
+	}
+	return postStackRequest{
+		ProjectID: id,
+		Stack:     stack,
+	}, nil
 }
 
 // Encode Response Functions

@@ -12,15 +12,29 @@ import (
 type Service interface {
 	PostProject(ctx context.Context, p Project) (string, error)
 	GetProject(ctx context.Context, id string) (Project, error)
+	PostStack(ctx context.Context, projectID string, s Stack) (string, error)
 }
 
 // Project is a top level Project resource
 type Project struct {
-	ID        string `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	UpdateTs  string `json:"update-ts"`
-	CreatedTs string `json:"created-ts"`
+	ID        string  `json:"id"`
+	Name      string  `json:"name"`
+	Email     string  `json:"email"`
+	UpdateTs  string  `json:"update-ts"`
+	CreatedTs string  `json:"created-ts"`
+	Stacks    []Stack `json:"stacks,omitempty"`
+}
+
+// Stack is a struct representing a collection of assets for a project
+type Stack struct {
+	ID     string  `json:"id"`
+	Assets []Asset `json:"assets,omitempty"`
+}
+
+// Asset is a struct representing an asset (i.e EC2 Instance or Load Balancer)
+type Asset struct {
+	ID   string `json:"id"`
+	Type string `json:"type"`
 }
 
 var (
@@ -80,6 +94,23 @@ func (s *inmemService) GetProject(ctx context.Context, id string) (Project, erro
 	return p, nil
 }
 
+func (s *inmemService) PostStack(ctx context.Context, projectID string, st Stack) (string, error) {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	p, ok := s.m[projectID]
+	if !ok {
+		return "", ErrNotFound
+	}
+	for _, stack := range p.Stacks {
+		if stack.ID == st.ID {
+			return "", ErrAlreadyExists
+		}
+	}
+	p.Stacks = append(p.Stacks, st)
+	s.m[projectID] = p
+	return p.ID, nil
+}
+
 func (s *cassandraService) PostProject(ctx context.Context, p Project) (string, error) {
 
 	err := s.db.Query(`INSERT INTO projects (id, name, email, update_ts, created_ts) VALUES (?, ?, ?, ?, ?)`,
@@ -114,4 +145,8 @@ func (s *cassandraService) GetProject(ctx context.Context, id string) (Project, 
 	}
 	return p, nil
 
+}
+
+func (s *cassandraService) PostStack(ctx context.Context, projectID string, st Stack) (string, error) {
+	panic("not implemented")
 }

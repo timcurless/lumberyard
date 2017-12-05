@@ -10,6 +10,7 @@ import (
 type Endpoints struct {
 	PostProjectEndpoint endpoint.Endpoint
 	GetProjectEndpoint  endpoint.Endpoint
+	PostStackEndpoint   endpoint.Endpoint
 }
 
 // MakeServerEndpoints Create a collection of server endpoints
@@ -17,6 +18,7 @@ func MakeServerEndpoints(s Service) Endpoints {
 	return Endpoints{
 		PostProjectEndpoint: MakePostProjectEndpoint(s),
 		GetProjectEndpoint:  MakeGetProjectEndpoint(s),
+		PostStackEndpoint:   MakePostStackEndpoint(s),
 	}
 }
 
@@ -42,6 +44,17 @@ func (e Endpoints) GetProject(ctx context.Context, id string) (Project, error) {
 	return resp.Project, resp.Err
 }
 
+// PostStack endpoint to add a new stack to a specified project
+func (e Endpoints) PostStack(ctx context.Context, projectID string, s Stack) error {
+	request := postStackRequest{ProjectID: projectID, Stack: s}
+	response, err := e.PostStackEndpoint(ctx, request)
+	if err != nil {
+		return err
+	}
+	resp := response.(postStackResponse)
+	return resp.Err
+}
+
 // MakePostProjectEndpoint factory function
 func MakePostProjectEndpoint(s Service) endpoint.Endpoint {
 	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
@@ -60,13 +73,22 @@ func MakeGetProjectEndpoint(s Service) endpoint.Endpoint {
 	}
 }
 
+// MakePostStackEndpoint factory function
+func MakePostStackEndpoint(s Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(postStackRequest)
+		id, e := s.PostStack(ctx, req.ProjectID, req.Stack)
+		return postProjectResponse{ID: id, Err: e}, nil
+	}
+}
+
 // Request/Response Types
 type postProjectRequest struct {
 	Project Project
 }
 
 type postProjectResponse struct {
-	ID  string `json:"id"`
+	ID  string `json:"project_id"`
 	Err error  `json:"err,omitempty"`
 }
 
@@ -82,3 +104,15 @@ type getProjectResponse struct {
 }
 
 func (r getProjectResponse) error() error { return r.Err }
+
+type postStackRequest struct {
+	ProjectID string
+	Stack     Stack
+}
+
+type postStackResponse struct {
+	ID  string `json:"stack_id"`
+	Err error  `json:"err,omitempty"`
+}
+
+func (r postStackResponse) error() error { return r.Err }

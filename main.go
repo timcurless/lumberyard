@@ -28,8 +28,8 @@ func main() {
 
 	var s service.Service
 	{
-		s = service.NewCassandraService("127.0.0.1", "notused", "notused", "lumberyard")
-		//s = service.NewInmemService()
+		//s = service.NewCassandraService("127.0.0.1", "notused", "notused", "lumberyard")
+		s = service.NewInmemService()
 		s = service.LoggingMiddleware(logger)(s)
 	}
 
