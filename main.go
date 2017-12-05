@@ -1,37 +1,54 @@
 package main
 
 import (
-	"encoding/json"
-	"log"
+	"flag"
+	"fmt"
 	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 
-	"github.com/gorilla/mux"
-	"github.com/timcurless/lumberyard/Cassandra"
-	"github.com/timcurless/lumberyard/Pipelines"
-	"github.com/timcurless/lumberyard/Stages"
-	"github.com/timcurless/lumberyard/Projects"
+	"github.com/go-kit/kit/log"
+
+	"github.com/timcurless/lumberyard/service"
 )
 
-type heartbeatResponse struct {
-	Status string `json:"status"`
-	Code   int    `json:"code"`
-}
-
 func main() {
-	CassandraSession := Cassandra.Session
-	defer CassandraSession.Close()
+	var (
+		httpaddr = flag.String("http.addr", ":8081", "HTTP Listen Address")
+	)
+	flag.Parse()
 
-	router := mux.NewRouter().StrictSlash(true)
-	router.HandleFunc("/", heartbeat)
-	router.HandleFunc("/api/v1/pipelines", Pipelines.Get).Methods("GET")
-	router.HandleFunc("/api/v1/pipelines", Pipelines.Post).Methods("POST")
-	router.HandleFunc("/api/v1/pipelines/{pipeline_uuid}", Pipelines.GetOne).Methods("GET")
-	router.HandleFunc("/api/v1/pipelines/{pipeline_uuid}/stages", Stages.Post).Methods("POST")
-	router.HandleFunc("/api/v1/projects", Projects.Post).Methods("POST")
+	var logger log.Logger
+	{
+		logger = log.NewLogfmtLogger(os.Stderr)
+		logger = log.With(logger, "ts", log.DefaultTimestampUTC)
+		logger = log.With(logger, "caller", log.DefaultCaller)
+	}
 
-	log.Fatal(http.ListenAndServe(":8081", router))
-}
+	var s service.Service
+	{
+		s = service.NewCassandraService("127.0.0.1", "notused", "notused", "lumberyard")
+		//s = service.NewInmemService()
+		s = service.LoggingMiddleware(logger)(s)
+	}
 
-func heartbeat(w http.ResponseWriter, r *http.Request) {
-	json.NewEncoder(w).Encode(heartbeatResponse{Status: "OK", Code: 200})
+	var h http.Handler
+	{
+		h = service.MakeHTTPHandler(s, log.With(logger, "component", "HTTP"))
+	}
+
+	errs := make(chan error)
+	go func() {
+		c := make(chan os.Signal)
+		signal.Notify(c, syscall.SIGINT, syscall.SIGTERM)
+		errs <- fmt.Errorf("%s", <-c)
+	}()
+
+	go func() {
+		logger.Log("transport", "http", "addr", *httpaddr)
+		errs <- http.ListenAndServe(*httpaddr, h)
+	}()
+
+	logger.Log("exit", <-errs)
 }

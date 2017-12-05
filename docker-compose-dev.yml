@@ -10,7 +10,7 @@ services:
       - dbnet
 
   dbinit:
-    image: timcurless/cassandra_mig:3
+    image: timcurless/cassandra_mig
     depends_on:
       - db
     networks:
