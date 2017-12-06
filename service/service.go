@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log"
 	"sync"
 
 	"github.com/gocql/gocql"
@@ -18,20 +19,20 @@ type Service interface {
 
 // Project is a top level Project resource
 type Project struct {
-	ID        string  `json:"id"`
-	Name      string  `json:"name"`
-	Email     string  `json:"email"`
-	UpdateTs  string  `json:"update-ts"`
-	CreatedTs string  `json:"created-ts"`
-	Stacks    []Stack `json:"stacks,omitempty"`
+	ID        gocql.UUID `json:"id"`
+	Name      string     `json:"name"`
+	Email     string     `json:"email"`
+	UpdateTs  string     `json:"update-ts"`
+	CreatedTs string     `json:"created-ts"`
+	Stacks    []Stack    `json:"stacks,omitempty"`
 }
 
 // Stack is a struct representing a collection of assets for a project
 type Stack struct {
-	ID        string  `json:"id"`
-	Assets    []Asset `json:"assets,omitempty"`
-	UpdateTs  string  `json:"update-ts"`
-	CreatedTs string  `json:"created-ts"`
+	ID        gocql.UUID `json:"id"`
+	Assets    []Asset    `json:"assets,omitempty"`
+	UpdateTs  string     `json:"update-ts"`
+	CreatedTs string     `json:"created-ts"`
 }
 
 // Asset is a struct representing an asset (i.e EC2 Instance or Load Balancer)
@@ -74,8 +75,8 @@ func NewCassandraService(uri string) Service {
 		panic("Failed initializing Cassandra master Session")
 	}
 
-	if err := initSchema(session); err != nil {
-		panic("Failed initializing Cassandra Schema: " + err.Error())
+	if er := initSchema(session); er != nil {
+		panic("Failed initializing Cassandra Schema: " + er.Error())
 	}
 
 	cluster.Keyspace = "lumberyard"
@@ -111,12 +112,12 @@ func initSchema(s *gocql.Session) error {
 		}*/
 
 	if err := s.Query(`CREATE TABLE IF NOT EXISTS lumberyard.projects (
-											 id         text,
+											 id         uuid,
 											 name       text,
 											 email      text,
 											 update_ts  text,
 											 created_ts text,
-											 stacks     text,
+											 stacks     set<text>,
 											 PRIMARY KEY (id)
 										)`).Exec(); err != nil {
 		return err
@@ -128,11 +129,12 @@ func initSchema(s *gocql.Session) error {
 func (s *inmemService) PostProject(ctx context.Context, p Project) (string, error) {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
-	if _, ok := s.m[p.ID]; ok {
+	strID := p.ID.String()
+	if _, ok := s.m[strID]; ok {
 		return "", ErrAlreadyExists
 	}
-	s.m[p.ID] = p
-	return p.ID, nil
+	s.m[strID] = p
+	return strID, nil
 }
 
 func (s *inmemService) GetProject(ctx context.Context, id string) (Project, error) {
@@ -159,17 +161,18 @@ func (s *inmemService) PostStack(ctx context.Context, projectID string, st Stack
 	}
 	p.Stacks = append(p.Stacks, st)
 	s.m[projectID] = p
-	return p.ID, nil
+	return p.ID.String(), nil
 }
 
 func (s *cassandraService) PostProject(ctx context.Context, p Project) (string, error) {
-	json, _ := json.Marshal(p.Stacks)
+	stacksJSON := stacksToJSON(p.Stacks)
+
 	err := s.db.Query(`INSERT INTO projects (id, name, email, update_ts, created_ts, stacks) VALUES (?, ?, ?, ?, ?, ?)`,
-		p.ID, p.Name, p.Email, p.UpdateTs, p.CreatedTs, json).Exec()
+		p.ID, p.Name, p.Email, p.UpdateTs, p.CreatedTs, stacksJSON).Exec()
 	if err != nil {
 		return "", err
 	}
-	return p.ID, nil
+	return p.ID.String(), nil
 }
 
 func (s *cassandraService) GetProject(ctx context.Context, id string) (Project, error) {
@@ -182,12 +185,14 @@ func (s *cassandraService) GetProject(ctx context.Context, id string) (Project, 
 
 	for iterable.MapScan(m) {
 		found = true
-		var stacku []Stack
-		if err := fromJson(m["stacks"].(string), &stacku); err != nil {
+
+		stacku, err := stacksFromJSON(m["stacks"].([]string))
+		if err != nil {
 			return Project{}, err
 		}
+
 		p = Project{
-			ID:        m["id"].(string),
+			ID:        m["id"].(gocql.UUID),
 			Name:      m["name"].(string),
 			Email:     m["email"].(string),
 			UpdateTs:  m["update_ts"].(string),
@@ -205,16 +210,37 @@ func (s *cassandraService) GetProject(ctx context.Context, id string) (Project, 
 }
 
 func (s *cassandraService) PostStack(ctx context.Context, projectID string, st Stack) (string, error) {
+	stackJSON, _ := json.Marshal(st)
+	query := "UPDATE projects SET stacks = stacks + ? WHERE id = ?"
 
-	query := "UPDATE projects SET stacks = ? + stacks WHERE id = ?"
-
-	err := s.db.Query(query, st, projectID).Exec()
+	err := s.db.Query(query, stackJSON, projectID).Exec()
 	if err != nil {
 		return "", err
 	}
-	return st.ID, nil
+	return st.ID.String(), nil
 }
 
-func fromJson(jsonSrc string, s *[]Stack) error {
-	return json.Unmarshal([]byte(jsonSrc), s)
+func stacksFromJSON(stacksJSON []string) ([]Stack, error) {
+	var s []Stack
+	var err error
+
+	for _, stackJSON := range stacksJSON {
+		stack := Stack{}
+		err = json.Unmarshal([]byte(stackJSON), &stack)
+		s = append(s, stack)
+	}
+	if err != nil {
+		return s, err
+	}
+	return s, nil
+}
+
+func stacksToJSON(stacks []Stack) []string {
+	var stacksJSON []string
+	for _, stack := range stacks {
+		stackJSON, _ := json.Marshal(stack)
+		stacksJSON = append(stacksJSON, string(stackJSON))
+		log.Println("stack: " + string(stackJSON))
+	}
+	return stacksJSON
 }

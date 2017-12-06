@@ -44,7 +44,7 @@ func MakeHTTPHandler(s Service, logger log.Logger) http.Handler {
 		encodeResponse,
 		options...,
 	))
-	r.Methods("POST").Path("/projects/{id}/stacks").Handler(httptransport.NewServer(
+	r.Methods("POST").Path("/projects/{id}/stacks/").Handler(httptransport.NewServer(
 		e.PostStackEndpoint,
 		decodePostStackRequest,
 		encodeResponse,
@@ -62,14 +62,25 @@ func decodePostProjectRequest(_ context.Context, r *http.Request) (request inter
 	if e != nil {
 		return "", e
 	}
-	randUUIDstr := randUUID.String()
+
+	nowTime := time.Now().String()
 
 	if e := json.NewDecoder(r.Body).Decode(&req.Project); e != nil {
 		return nil, e
 	}
-	req.Project.CreatedTs = time.Now().String()
-	req.Project.UpdateTs = time.Now().String()
-	req.Project.ID = randUUIDstr
+	req.Project.CreatedTs = nowTime
+	req.Project.UpdateTs = nowTime
+	req.Project.ID = randUUID
+
+	for i := range req.Project.Stacks {
+		randStackUUID, e := gocql.RandomUUID()
+		if e != nil {
+			return "", e
+		}
+		req.Project.Stacks[i].ID = randStackUUID
+		req.Project.Stacks[i].CreatedTs = nowTime
+		req.Project.Stacks[i].UpdateTs = nowTime
+	}
 	return req, nil
 }
 
@@ -83,19 +94,28 @@ func decodeGetProjectRequest(_ context.Context, r *http.Request) (request interf
 }
 
 func decodePostStackRequest(_ context.Context, r *http.Request) (request interface{}, err error) {
+
 	vars := mux.Vars(r)
 	id, ok := vars["id"]
 	if !ok {
 		return nil, ErrBadRouting
 	}
-	var stack Stack
-	if err := json.NewDecoder(r.Body).Decode(&stack); err != nil {
+
+	var req postStackRequest
+	if err := json.NewDecoder(r.Body).Decode(&req.Stack); err != nil {
 		return nil, err
 	}
-	return postStackRequest{
-		ProjectID: id,
-		Stack:     stack,
-	}, nil
+
+	randUUID, e := gocql.RandomUUID()
+	if e != nil {
+		return "", e
+	}
+
+	req.ProjectID = id
+	req.Stack.ID = randUUID
+	req.Stack.CreatedTs = time.Now().String()
+	req.Stack.UpdateTs = time.Now().String()
+	return req, nil
 }
 
 // Encode Response Functions
