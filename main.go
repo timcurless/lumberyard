@@ -16,6 +16,7 @@ import (
 func main() {
 	var (
 		httpaddr = flag.String("http.addr", ":8081", "HTTP Listen Address")
+		dbtype   = flag.String("db.type", "inmem", "Database type: inmem or cassandra")
 	)
 	flag.Parse()
 
@@ -28,8 +29,11 @@ func main() {
 
 	var s service.Service
 	{
-		//s = service.NewCassandraService("127.0.0.1", "notused", "notused", "lumberyard")
-		s = service.NewInmemService()
+		if *dbtype == "cassandra" {
+			s = service.NewCassandraService("127.0.0.1")
+		} else {
+			s = service.NewInmemService()
+		}
 		s = service.LoggingMiddleware(logger)(s)
 	}
 
