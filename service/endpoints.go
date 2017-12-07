@@ -8,17 +8,19 @@ import (
 
 // Endpoints available in this service
 type Endpoints struct {
-	PostProjectEndpoint endpoint.Endpoint
-	GetProjectEndpoint  endpoint.Endpoint
-	PostStackEndpoint   endpoint.Endpoint
+	PostProjectEndpoint      endpoint.Endpoint
+	GetProjectEndpoint       endpoint.Endpoint
+	PostStackEndpoint        endpoint.Endpoint
+	GetProjectStacksEndpoint endpoint.Endpoint
 }
 
 // MakeServerEndpoints Create a collection of server endpoints
 func MakeServerEndpoints(s Service) Endpoints {
 	return Endpoints{
-		PostProjectEndpoint: MakePostProjectEndpoint(s),
-		GetProjectEndpoint:  MakeGetProjectEndpoint(s),
-		PostStackEndpoint:   MakePostStackEndpoint(s),
+		PostProjectEndpoint:      MakePostProjectEndpoint(s),
+		GetProjectEndpoint:       MakeGetProjectEndpoint(s),
+		PostStackEndpoint:        MakePostStackEndpoint(s),
+		GetProjectStacksEndpoint: MakeGetProjectStacksEndpoint(s),
 	}
 }
 
@@ -82,6 +84,14 @@ func MakePostStackEndpoint(s Service) endpoint.Endpoint {
 	}
 }
 
+func MakeGetProjectStacksEndpoint(s Service) endpoint.Endpoint {
+	return func(ctx context.Context, request interface{}) (response interface{}, err error) {
+		req := request.(getProjectStacksRequest)
+		stacks, e := s.GetProjectStacks(ctx, req.ID)
+		return getProjectStacksResponse{Stacks: stacks, Err: e}, nil
+	}
+}
+
 // Request/Response Types
 type postProjectRequest struct {
 	Project Project
@@ -116,3 +126,14 @@ type postStackResponse struct {
 }
 
 func (r postStackResponse) error() error { return r.Err }
+
+type getProjectStacksRequest struct {
+	ID string
+}
+
+type getProjectStacksResponse struct {
+	Stacks []Stack `json:"stacks,omitempty"`
+	Err    error   `json:"err,omitempty"`
+}
+
+func (r getProjectStacksResponse) error() error { return r.Err }

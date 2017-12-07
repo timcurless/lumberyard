@@ -45,3 +45,10 @@ func (mw loggingMiddleware) PostStack(ctx context.Context, projectID string, st 
 	}(time.Now())
 	return mw.next.PostStack(ctx, projectID, st)
 }
+
+func (mw loggingMiddleware) GetProjectStacks(ctx context.Context, id string) (st []Stack, err error) {
+	defer func(begin time.Time) {
+		mw.logger.Log("method", "GetProjectStacks", "id", id, "took", time.Since(begin), "err", err)
+	}(time.Now())
+	return mw.next.GetProjectStacks(ctx, id)
+}

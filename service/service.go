@@ -15,6 +15,7 @@ type Service interface {
 	PostProject(ctx context.Context, p Project) (string, error)
 	GetProject(ctx context.Context, id string) (Project, error)
 	PostStack(ctx context.Context, projectID string, s Stack) (string, error)
+	GetProjectStacks(ctx context.Context, id string) ([]Stack, error)
 }
 
 // Project is a top level Project resource
@@ -101,16 +102,6 @@ func initSchema(s *gocql.Session) error {
 		return err
 	}
 
-	/*
-		if err := s.Query(`CREATE TYPE IF NOT EXISTS lumberyard.stack (
-			 									 id         text,
-												 assets     map<text, text>,
-												 update_ts  text,
-												 created_ts text
-											 )`).Exec(); err != nil {
-			return err
-		}*/
-
 	if err := s.Query(`CREATE TABLE IF NOT EXISTS lumberyard.projects (
 											 id         uuid,
 											 name       text,
@@ -162,6 +153,10 @@ func (s *inmemService) PostStack(ctx context.Context, projectID string, st Stack
 	p.Stacks = append(p.Stacks, st)
 	s.m[projectID] = p
 	return p.ID.String(), nil
+}
+
+func (s *inmemService) GetProjectStacks(ctx context.Context, id string) ([]Stack, error) {
+	panic("not implemented yet")
 }
 
 func (s *cassandraService) PostProject(ctx context.Context, p Project) (string, error) {
@@ -219,6 +214,30 @@ func (s *cassandraService) PostStack(ctx context.Context, projectID string, st S
 		return "", err
 	}
 	return st.ID.String(), nil
+}
+
+func (s *cassandraService) GetProjectStacks(ctx context.Context, id string) ([]Stack, error) {
+	var found = false
+	m := map[string]interface{}{}
+	var stacku []Stack
+
+	query := "SELECT stacks FROM projects WHERE id=? LIMIT 1"
+	iterable := s.db.Query(query, id).Consistency(gocql.One).Iter()
+
+	for iterable.MapScan(m) {
+		found = true
+		var err error
+
+		stacku, err = stacksFromJSON(m["stacks"].([]string))
+		if err != nil {
+			return []Stack{}, err
+		}
+	}
+
+	if !found {
+		return nil, ErrNotFound
+	}
+	return stacku, nil
 }
 
 func stacksFromJSON(stacksJSON []string) ([]Stack, error) {
