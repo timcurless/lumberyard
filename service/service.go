@@ -210,7 +210,8 @@ func (s *cassandraService) GetProject(ctx context.Context, id string) (Project, 
 }
 
 func (s *cassandraService) PostStack(ctx context.Context, projectID string, st Stack) (string, error) {
-	stackJSON, _ := json.Marshal(st)
+	var stackJSON []string
+	stackJSON = append(stackJSON, stackToJSON(st))
 	query := "UPDATE projects SET stacks = stacks + ? WHERE id = ?"
 
 	err := s.db.Query(query, stackJSON, projectID).Exec()
@@ -240,7 +241,12 @@ func stacksToJSON(stacks []Stack) []string {
 	for _, stack := range stacks {
 		stackJSON, _ := json.Marshal(stack)
 		stacksJSON = append(stacksJSON, string(stackJSON))
-		log.Println("stack: " + string(stackJSON))
 	}
 	return stacksJSON
+}
+
+func stackToJSON(stack Stack) string {
+	stackJSON, _ := json.Marshal(stack)
+	log.Println("stackjson is " + string(stackJSON))
+	return string(stackJSON)
 }
